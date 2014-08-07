@@ -1,21 +1,21 @@
 ## Elastic DynamoDb 
 
-  an OnDemand tool to help with auto scaling of dynamic-dynamodb
+  an OnDemand tool to help with auto scaling of [dynamic-dynamodb](https://github.com/sebdah/dynamic-dynamodb)
 
-[dynamic-dynamodb](https://github.com/sebdah/dynamic-dynamodb) tool is great for autoscaling,
+[dynamic-dynamodb](https://github.com/sebdah/dynamic-dynamodb) tool is great for autoscaling but it has a few limitation:
 
-however it does not scale down at once to certian value
+* it does not scale down at once to certian value
 
-and it does not accomodate for anticipated traffic spike that can last X hours
+* it does not accomodate for anticipated traffic spike that can last X hours
 
-also it does not scale down to a value at once
+* it does not scale down to a value at once
 
-This tool is intended to extend the functionality of dynamic-dynamodb, allowing you to scale by a factor (up/down) and elastically return to the original values it had before
 
-  it possible to automate the start and stop of the service by passing a bash command to the --start_cmd / --stop_cmd
+ElasticDynamoDb is intended to extend the functionality of dynamic-dynamodb, allowing you to scale by a factor (up/down) and elastically return to the original values it had before
+
+it's possible to automate the start and stop of the dynamic-dyanmodb service by passing a bash command (wrapped in quotes) to the --start_cmd / --stop_cmd options
 
 ## Installation
-
     $ gem install elasticDynamoDb
 
 Usage:

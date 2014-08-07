@@ -64,13 +64,13 @@ Options:
   --factor scale factor can be decimal too 0.5 for instance
   [--schedule-restore=number of minutes for ElasticDynamoDb to restore original values] # Default: 0 (No restore)
   [--working-dir=location for backup config and change log [default current dir]]
-  [--stop-cmd=bash stop command for dynamic-dynamodb service]
-  [--start-cmd=bash start command for dynamic-dynamodb service]
+  [--stop-cmd=bash stop command for dynamic-dynamodb service (must be wrapped in quotes)]
+  [--start-cmd=bash start command for dynamic-dynamodb service (must be wrapped in quotes)]
   HELP
   say(help_block)
   end
-private
 
+private
   def process_config(file, factor)
     read_config(file)
     scale(factor)
@@ -179,11 +179,6 @@ private
     File.open(@@config_file, 'w') do |file|
       file.write str
     end
-  end
-
-  def history
-    file = File.readlines(@@log_file) if @@log_file
-    file.map!{|x| x.split(':').last.to_i}
   end
 
   def update_aws_api
