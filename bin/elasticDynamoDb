@@ -21,17 +21,18 @@ class ElasticDynamoDb < Thor
       exit
     end
     
-    FileUtils.mkdir_p "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/dynamodb_config_backups"
-    
-    @@bkp_folder  = "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/dynamodb_config_backups"
-    @@log_file    = "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/change.log"
-    @@working_dir = options[:working_dir]
     @@config_file = options[:config_file]
     @@in_restore  = false
     @@timestamp   = Time.now.strftime("%m%d%Y-%H%M%S")
 
- 
-    process_config(@@config_file, options[:factor])
+    @@working_dir = options[:working_dir]
+    @@bkp_folder  = "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/dynamodb_config_backups"
+    @@log_file    = "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/change.log" 
+    @@original_config_file = "#{@@bkp_folder}/#{@@config_file}-#{@@timestamp}"
+
+    FileUtils.mkdir_p "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/dynamodb_config_backups"
+
+    process_config(@@config_file, options[:factor])    
     
     if options[:schedule_restore] > 0 && !@@in_restore
       say("#{Time.now} - Waiting here for #{options[:schedule_restore]} minutes until restore")
@@ -100,8 +101,8 @@ private
         min_writes = @@config[prefix]['min-provisioned-writes'].to_i
 
         say("(scale factor: #{scale_factor}) Global Secondary Index / Table: #{prefix.gsub('$','').gsub('^', '')} =>", color=:cyan)
-        puts "Current min-read: #{min_reads}"
-        puts "Current min-write: #{min_writes}"
+        puts "Current min-read from #{@@config_file}: #{min_reads}"
+        puts "Current min-write from #{@@config_file}: #{min_writes}"
 
         @@config[prefix]['min-provisioned-reads'] = (min_reads * scale_factor).to_i
         @@config[prefix]['min-provisioned-writes'] = (min_writes * scale_factor).to_i
@@ -118,15 +119,15 @@ private
 
   def write_config(scale_factor)
     if options[:schedule_restore] > 0 
-      restore = "auto restore in #{options[:schedule_restore]} minutes"
+      restore = "auto restore to bakcup config file (#{@@original_config_file}) in #{options[:schedule_restore]} minutes"
     else
-      restore = "auto backup"
+      restore = "Backup to #{@@original_config_file}"
     end
 
     if @@in_restore
       confirmed = true
     else
-      confirmed = yes?("Write the new config file (#{restore})? (yes/no)", color=:red)
+      confirmed = yes?("OverWrite the new config file (#{restore})? (yes/no)", color=:red)
     end
 
     if confirmed
@@ -170,9 +171,8 @@ private
   end
 
   def backup
-    `mkdir -p #{@@bkp_folder} && cp #{@@config_file} #{@@bkp_folder}/#{@@config_file}-#{@@timestamp}` if @@config_file
-    @@original_config_file = "#{@@bkp_folder}/#{@@config_file}-#{@@timestamp}"
-    say "backup file created: #{@@config_file}-#{@@timestamp}"
+    `mkdir -p #{@@bkp_folder} && cp #{@@config_file} #{@@original_config_file}` if @@config_file
+    say "backup file created: #{@@original_config_file}"
   end
 
   def save_file(str)
