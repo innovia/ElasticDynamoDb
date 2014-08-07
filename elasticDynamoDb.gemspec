@@ -2,10 +2,10 @@ $:.push File.expand_path("../lib", __FILE__)
 
 Gem::Specification.new do |s|
   s.name        = "elasticDynamoDb"
-  s.version     = '1.0.0'
+  s.version     = '1.0.1'
   s.authors     = ["Ami Mahloof"]
   s.email       = "ami.mahloof@gmail.com"
-  s.homepage    = "https://github.com/innovia"
+  s.homepage    = "https://github.com/innovia/ElasticDynamoDb"
   s.summary     = "scale dynamodb by factor with dynamic-dynamodb"
   s.description = "scale dynamodb by factor with dynamic-dynamodb"
   s.required_rubygems_version = ">= 1.3.6"
