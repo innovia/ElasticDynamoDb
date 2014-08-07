@@ -12,7 +12,9 @@
     $ gem install elasticDynamoDb
 
 Usage:
+````bash
   elasticDynamoDb onDemand --config-file=location of dynamic-dynamodb.conf --factor=Scale factor (can be decimal too, i.e: 0.5) --schedule-restore 120
+````
 
 Options:
   --config-file=location of dynamic-dynamodb.conf
