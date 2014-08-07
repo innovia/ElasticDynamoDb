@@ -1,4 +1,4 @@
-## Elastic DynamoDb 
+## Elastic DynamoDb [![Gem Version](https://badge.fury.io/rb/elasticDynamoDb.svg)](http://badge.fury.io/rb/elasticDynamoDb)
 
   an OnDemand tool to help with auto scaling of [dynamic-dynamodb](https://github.com/sebdah/dynamic-dynamodb)
 
