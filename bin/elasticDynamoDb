@@ -1,0 +1,306 @@
+#!/usr/bin/env ruby
+require 'thor'
+require 'aws-sdk'
+require 'fileutils'
+require_relative '../lib/configparser'
+
+class ElasticDynamoDb < Thor
+  default_task :show_help
+  include Thor::Actions
+
+  desc "onDemand", "Ease autoscale by schedule or scale factor"
+  method_option :factor, :required => true,  :alias => 'f', :type => :numeric, :banner => 'scale factor can be decimal too 0.5 for instance'
+  method_option :schedule_restore, :alias => 's', :type => :numeric, :banner => 'number of minutes for ElasticDynamoDb to restore original values', :default => 0
+  method_option :working_dir, :default => '.', :alais => 'd', :banner => 'location for backup config and change log [default current dir]'
+  method_option :config_file, :required => true, :alias => 'c', :banner => 'location of dynamic-dynamodb.conf'
+  method_option :stop_cmd, :banner => 'bash stop command for dynamic-dynamodb service' 
+  method_option :start_cmd, :banner => 'bash start command for dynamic-dynamodb service' 
+  def onDemand
+    if dynamic_dynamodb_running?
+      say("Dynamic-DynamoDB is running - no point in changing values while old config is in memory, stop the service and re-run ElasticDynamoDb", color=:red)
+      exit
+    end
+    
+    FileUtils.mkdir_p "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/dynamodb_config_backups"
+    
+    @@bkp_folder  = "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/dynamodb_config_backups"
+    @@log_file    = "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/change.log"
+    @@working_dir = options[:working_dir]
+    @@config_file = options[:config_file]
+    @@in_restore  = false
+    @@timestamp   = Time.now.strftime("%m%d%Y-%H%M%S")
+
+ 
+    process_config(@@config_file, options[:factor])
+    
+    if options[:schedule_restore] > 0 && !@@in_restore
+      say("#{Time.now} - Waiting here for #{options[:schedule_restore]} minutes until restore")
+      sleep options[:schedule_restore] * 60
+      @@in_restore = true
+      say "#{Time.now} - Restoring to original config file (#{@@original_config_file}))"
+      process_config(@@original_config_file, 1)
+    end
+      
+    say("All done! you may restart the dynamic-dynamodb process")
+  end
+
+  desc 'show_help', 'Display Usage'
+  def show_help
+    help_block = <<-HELP
+Elastic DynamoDb - an OnDemand tool to help with auto scaling of dynamic-dynamodb
+Synopsis:
+  dynamic-dynamodb tool is great for autoscaling, however it does not scale down at once to certian value
+  and it does not accomodate for anticipated traffic spike that can last X hours
+
+  This tool is intended to extend the functionality of dynamic-dynamodb, allowing you to scale by a factor (up/down) and elastically return to the original values it had before
+
+  it possible to automate the start and stop of the service by passing a bash command to the --start_cmd / --stop_cmd
+
+Usage:
+  elasticDynamoDb onDemand --config-file=location of dynamic-dynamodb.conf --factor=Scale factor (can be decimal too, i.e: 0.5) --schedule-restore 120
+
+Options:
+  --config-file=location of dynamic-dynamodb.conf
+  --factor scale factor can be decimal too 0.5 for instance
+  [--schedule-restore=number of minutes for ElasticDynamoDb to restore original values] # Default: 0 (No restore)
+  [--working-dir=location for backup config and change log [default current dir]]
+  [--stop-cmd=bash stop command for dynamic-dynamodb service]
+  [--start-cmd=bash start command for dynamic-dynamodb service]
+  HELP
+  say(help_block)
+  end
+private
+
+  def process_config(file, factor)
+    read_config(file)
+    scale(factor)
+    write_config(factor)
+    system(stop_cmd) if options[:stop_cmd]
+    update_aws_api
+    system(start_cmd) if options[:start_cmd]
+  end
+
+  def dynamic_dynamodb_running?
+    dynamic_dynamodb_pid = `ps aux | grep -v grep | grep -i dynamic-dynamodb | awk {'print $2'}`.to_i
+    return Dir['/proc/[0-9]*'].map { |i| i.match(/\d+/)[0].to_i }.include?(dynamic_dynamodb_pid)  
+  end
+
+  def read_config(config_file)
+    @@config = ConfigParser.new(config_file).parse
+  end
+
+  def scale(factor=nil)
+    if !factor.nil?
+      scale_factor = factor
+
+      active_throughputs = @@config.keys.select{|k| k =~ /table/}
+      
+      active_throughputs.each do |prefix|
+        min_reads  = @@config[prefix]['min-provisioned-reads'].to_i
+        min_writes = @@config[prefix]['min-provisioned-writes'].to_i
+
+        say("(scale factor: #{scale_factor}) Global Secondary Index / Table: #{prefix.gsub('$','').gsub('^', '')} =>", color=:cyan)
+        puts "Current min-read: #{min_reads}"
+        puts "Current min-write: #{min_writes}"
+
+        @@config[prefix]['min-provisioned-reads'] = (min_reads * scale_factor).to_i
+        @@config[prefix]['min-provisioned-writes'] = (min_writes * scale_factor).to_i
+
+        say("New min reads: #{@@config[prefix]['min-provisioned-reads']}", color=:yellow)
+        say("New min writes: #{@@config[prefix]['min-provisioned-writes']}", color=:yellow)
+        puts "------------------------------------------------"
+      end
+    else
+      say("Need a factor to scale by,(i.e scale --factor 2)", color=:green)
+      exit
+    end
+  end
+
+  def write_config(scale_factor)
+    if options[:schedule_restore] > 0 
+      restore = "auto restore in #{options[:schedule_restore]} minutes"
+    else
+      restore = "auto backup"
+    end
+
+    if @@in_restore
+      confirmed = true
+    else
+      confirmed = yes?("Write the new config file (#{restore})? (yes/no)", color=:red)
+    end
+
+    if confirmed
+      backup
+      
+      str_to_write = ''
+      @@config.each do |section, lines|
+        str_to_write += "[#{section}]\n"
+        lines.each do |line, value|
+          if line =~ /^(#|;|\n)/
+            str_to_write += "#{line}\n"
+          else
+            str_to_write += "#{line}: #{value}\n"
+          end
+        end
+      end
+      
+      save_file(str_to_write)
+
+      if !@@in_restore
+        reason = ask('type the reason for the change: ', color=:magenta)
+      else
+        reason = 'Auto restore to @@original_config_file'
+      end
+      
+      log_changes("#{reason} - Changed throughputs by factor of: #{scale_factor}")
+      
+      say("new config changes commited to file")
+    else
+      say("Not doing antything - Goodbye...", color=:green)
+      exit
+    end  
+  end
+
+  def log_changes(msg)
+    say("Recording change in #{@@log_file}")
+
+    File.open(@@log_file, 'a') do |file|
+      file.write "#{Time.now} - #{msg}\n"
+    end
+  end
+
+  def backup
+    `mkdir -p #{@@bkp_folder} && cp #{@@config_file} #{@@bkp_folder}/#{@@config_file}-#{@@timestamp}` if @@config_file
+    @@original_config_file = "#{@@bkp_folder}/#{@@config_file}-#{@@timestamp}"
+    say "backup file created: #{@@config_file}-#{@@timestamp}"
+  end
+
+  def save_file(str)
+    File.open(@@config_file, 'w') do |file|
+      file.write str
+    end
+  end
+
+  def history
+    file = File.readlines(@@log_file) if @@log_file
+    file.map!{|x| x.split(':').last.to_i}
+  end
+
+  def update_aws_api
+    if @@in_restore
+      confirmed = true
+    else
+      confirmed = yes?('Update all tables with these values on DynamoDb? (yes/no)', color=:red)
+    end
+
+    if confirmed
+      AWS.config({
+        :access_key_id => @@config['global']['aws-access-key-id'],
+        :secret_access_key => @@config['global']['aws-secret-access-key-id'],
+        :region => @@config['global']['region'],
+      })
+
+      @@ddb = AWS::DynamoDB::Client.new(:api_version => '2012-08-10')
+
+      provisioning ={}
+
+      active_throughputs = @@config.keys.select{|k| k =~ /table/}
+
+      active_throughputs.inject(provisioning) { |acc, config_section|
+        if config_section.include?('index')
+          config_section =~ /^gsi: \^(.*)\$\stable: \^(.*)\$$/
+          index = $1
+          table = $2
+
+          acc[table] ||= {}
+          acc[table][index] ||= {}
+          acc[table][index]['reads']  = @@config[config_section]['min-provisioned-reads'].to_i
+          acc[table][index]['writes'] = @@config[config_section]['min-provisioned-writes'].to_i
+        else
+          config_section =~ /^table:?\S\^(.*)\$/
+          table = $1
+          acc[table] ||= {}
+          acc[table]['reads']  = @@config[config_section]['min-provisioned-reads'].to_i
+          acc[table]['writes'] = @@config[config_section]['min-provisioned-writes'].to_i
+        end
+        acc  
+      }
+      update_tables(provisioning)
+      log_changes("Update AWS via api call with the following data:\n #{provisioning}\n")
+    end
+  end
+
+  def check_status(table_name)   
+    until table_status(table_name) == 'ACTIVE' && !indexes_status(table_name).any? {|i| i != 'ACTIVE'}
+      say("#{table_name} is not ACTIVE => sleeping for 30 sec and will retry again", color=:yellow)
+      sleep 30
+    end
+    return true
+  end
+
+  def table_status(table_name)
+    print "Checking table #{table_name} status..."
+    status = @@ddb.describe_table({:table_name => table_name}).table.table_status 
+    puts status
+    status
+  end
+
+  def indexes_status(table_name)
+    print "Checking indexes status on #{table_name}..."
+    indexes_status = []
+    if @@ddb.describe_table({:table_name => table_name}).table.keys.include?(:global_secondary_indexes)
+       @@ddb.describe_table({:table_name => table_name}).table.global_secondary_indexes.each {|i| indexes_status << i.index_status }
+    end
+
+    if indexes_status.empty?
+      puts "No indexes for #{table_name} table"
+    else 
+      puts indexes_status
+    end
+    indexes_status
+  end
+
+  def update_tables(provisioning)
+    provisioning.each do |table, values|
+      options = {
+                  :table_name => table,
+                  :provisioned_throughput => {
+                                              :read_capacity_units =>  values['reads'],
+                                              :write_capacity_units =>  values['writes']
+                  }
+      }
+      
+      # if one of the keys for the table contain index merge the options for update table
+      indexes = provisioning[table].keys.select { |key| key.match(/index/) }
+      if !indexes.empty?
+        indexes.each do |index|
+          options.merge!({ 
+                         :global_secondary_index_updates => [{:update => { 
+                                                                            :index_name => index,
+                                                                            :provisioned_throughput => {
+                                                                              :read_capacity_units =>  values[index]['reads'],
+                                                                              :write_capacity_units => values[index]['writes'] 
+                                                                            }
+                                                                          }
+                                                              }]
+          })
+        end
+      end
+
+      ready = check_status(table)
+      
+      begin
+        say("Updating provisioning for table: #{table}",color=:cyan)
+        @@ddb.update_table(options) if ready 
+      rescue Exception => e
+        if e.to_s.include?('must be at most 100 percent of current value')
+          say("No Change - Scale up is higher then 100% of the original values, restrating dynamic-dynamodb process will auto scale up to the new values", color=:yellow)
+        else
+          say("unable to update table: #{e}", color=:red)
+        end
+      end  
+    end
+  end
+end
+
+ElasticDynamoDb.start
