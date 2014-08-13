@@ -2,6 +2,7 @@
 require 'thor'
 require 'aws-sdk'
 require 'fileutils'
+
 require_relative '../lib/configparser'
 
 class ElasticDynamoDb < Thor
@@ -11,16 +12,11 @@ class ElasticDynamoDb < Thor
   desc "onDemand", "Ease autoscale by schedule or scale factor"
   method_option :factor, :required => true,  :alias => 'f', :type => :numeric, :banner => 'scale factor can be decimal too 0.5 for instance'
   method_option :schedule_restore, :alias => 's', :type => :numeric, :banner => 'number of minutes for ElasticDynamoDb to restore original values', :default => 0
-  method_option :working_dir, :default => '.', :alais => 'd', :banner => 'location for backup config and change log [default current dir]'
+  method_option :working_dir, :default => '.', :alias => 'd', :banner => 'location for backup config and change log [default current dir]'
   method_option :config_file, :required => true, :alias => 'c', :banner => 'location of dynamic-dynamodb.conf'
   method_option :stop_cmd, :banner => 'bash stop command for dynamic-dynamodb service' 
   method_option :start_cmd, :banner => 'bash start command for dynamic-dynamodb service' 
   def onDemand
-    if dynamic_dynamodb_running?
-      say("Dynamic-DynamoDB is running - no point in changing values while old config is in memory, stop the service and re-run ElasticDynamoDb", color=:red)
-      exit
-    end
-    
     @@config_file = options[:config_file]
     @@in_restore  = false
     @@timestamp   = Time.now.strftime("%m%d%Y-%H%M%S")
@@ -28,7 +24,8 @@ class ElasticDynamoDb < Thor
     @@working_dir = options[:working_dir]
     @@bkp_folder  = "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/dynamodb_config_backups"
     @@log_file    = "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/change.log" 
-    @@original_config_file = "#{@@bkp_folder}/#{@@config_file}-#{@@timestamp}"
+    config_file_name = File.basename(@@config_file)
+    @@original_config_file = "#{@@bkp_folder}/#{config_file_name}-#{@@timestamp}"
 
     FileUtils.mkdir_p "#{File.expand_path(@@working_dir)}/ElasticDynamoDb/dynamodb_config_backups"
 
@@ -76,9 +73,17 @@ private
     read_config(file)
     scale(factor)
     write_config(factor)
-    system(stop_cmd) if options[:stop_cmd]
+    begin
+      system(options[:stop_cmd]) if options[:stop_cmd]
+    rescue Exception => e
+      puts "error: #{e}"
+    end
     update_aws_api
-    system(start_cmd) if options[:start_cmd]
+    begin
+      system(options[:start_cmd]) if options[:start_cmd]
+    rescue Exception => e
+      puts "error: #{e}"
+    end
   end
 
   def dynamic_dynamodb_running?
