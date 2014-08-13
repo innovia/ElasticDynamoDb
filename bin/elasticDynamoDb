@@ -76,19 +76,9 @@ private
     begin
       system(options[:stop_cmd]) if options[:stop_cmd]
     rescue Exception => e
-      puts "error: #{e}"
+      puts "error trying the stop command: #{e}"
     end
     update_aws_api
-    begin
-      system(options[:start_cmd]) if options[:start_cmd]
-    rescue Exception => e
-      puts "error: #{e}"
-    end
-  end
-
-  def dynamic_dynamodb_running?
-    dynamic_dynamodb_pid = `ps aux | grep -v grep | grep -i dynamic-dynamodb | awk {'print $2'}`.to_i
-    return Dir['/proc/[0-9]*'].map { |i| i.match(/\d+/)[0].to_i }.include?(dynamic_dynamodb_pid)  
   end
 
   def read_config(config_file)
@@ -140,10 +130,13 @@ private
       
       str_to_write = ''
       @@config.each do |section, lines|
-        str_to_write += "[#{section}]\n"
+        if !section.include?('pre_section')
+          str_to_write += "[#{section}]\n"
+        end
+
         lines.each do |line, value|
-          if line =~ /^(#|;|\n)/
-            str_to_write += "#{line}\n"
+          if value =~ /^(#|;|\n)/
+            str_to_write += "#{value}"
           else
             str_to_write += "#{line}: #{value}\n"
           end
@@ -207,26 +200,39 @@ private
       active_throughputs = @@config.keys.select{|k| k =~ /table/}
 
       active_throughputs.inject(provisioning) { |acc, config_section|
-        if config_section.include?('index')
-          config_section =~ /^gsi: \^(.*)\$\stable: \^(.*)\$$/
-          index = $1
-          table = $2
-
+        config_section =~ /^(gsi:\ *\^(?<index>.*)\$|)\ *table:\ *\^(?<table>.*)\$/
+        index = $1
+        table = $2
+        
+        if config_section.include?('gsi')
           acc[table] ||= {}
           acc[table][index] ||= {}
           acc[table][index]['reads']  = @@config[config_section]['min-provisioned-reads'].to_i
           acc[table][index]['writes'] = @@config[config_section]['min-provisioned-writes'].to_i
         else
-          config_section =~ /^table:?\S\^(.*)\$/
-          table = $1
           acc[table] ||= {}
           acc[table]['reads']  = @@config[config_section]['min-provisioned-reads'].to_i
           acc[table]['writes'] = @@config[config_section]['min-provisioned-writes'].to_i
         end
         acc  
       }
-      update_tables(provisioning)
       log_changes("Update AWS via api call with the following data:\n #{provisioning}\n")
+      update_tables(provisioning)
+    else
+      if @@in_restore
+        confirmed = true
+      else
+        confirmed = yes?("send the start command #{options[:start_cmd]} ? (yes/no)")
+      end
+
+      if confirmed
+        begin
+          system(options[:start_cmd]) if options[:start_cmd]
+        rescue Exception => e
+          puts "error trying the start command: #{e}"
+        end
+      end
+      exit
     end
   end
 

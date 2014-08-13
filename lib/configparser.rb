@@ -10,24 +10,22 @@ class ConfigParser < Hash
       puts "error loading file -> #{e}"
     end
     config = {}
-    section = nil
-    key = nil
+    config_section = nil
 
-    input_source.inject(config) {|acc, line|
-      acc ||= {}
-
-      if line =~ /^\[(.+?)\]/ # if line contain section start adding it to a new hash key
-        section = $1
-        acc[section] ||= {}
-      elsif line =~ /^(#|;|\n)/
-        acc[section]["#{line}"] = line
-      elsif line =~ /^\s*(.+?)\s*[=:]\s*(.+)$/ # this returns a 2 parts $1 first response, $2 2nd response
-          key = $1
-          value = $2
-          acc[section] ||= {}
-          acc[section][key] = value
+    input_source.each_with_index.inject(config) {|acc, (line, index)|
+      if line =~ /^\[(.+?)\]/
+        config_section = $1
+        acc[config_section] ||= {}
+      elsif line =~ /^(#|;|\n)/ && config_section  
+          acc[config_section]["comment_#{index}"] = line
+      elsif line =~ /^\s*(.+?)\s*[=:]\s*(.+)$/ && config_section # this returns a 2 parts $1 key, $2 value
+          config_key   = $1
+          config_value = $2
+          acc[config_section][config_key] = config_value
+      else
+          acc['pre_section'] ||= {}
+          acc['pre_section']["comment_#{index}"] = line
       end
-
       acc
     }
   end
