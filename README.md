@@ -8,8 +8,6 @@
 
 * it does not accomodate for anticipated traffic spike that can last X hours
 
-* it does not scale down to a value at once
-
 
 ElasticDynamoDb is intended to extend the functionality of dynamic-dynamodb, allowing you to scale by a factor (up/down) and elastically return to the original values it had before
 

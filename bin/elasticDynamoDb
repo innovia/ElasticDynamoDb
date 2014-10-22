@@ -12,7 +12,7 @@ class ElasticDynamoDb < Thor
   desc "onDemand", "Ease autoscale by schedule or scale factor"
   method_option :factor, :required => true,  :alias => 'f', :type => :numeric, :banner => 'scale factor can be decimal too 0.5 for instance'
   method_option :schedule_restore, :alias => 's', :type => :numeric, :banner => 'number of minutes for ElasticDynamoDb to restore original values', :default => 0
-  method_option :working_dir, :default => '.', :alias => 'd', :banner => 'location for backup config and change log [default current dir]'
+  method_option :working_dir, :default => '~', :alias => 'd', :banner => 'location for backup config and change log [default home dir for the user]'
   method_option :config_file, :required => true, :alias => 'c', :banner => 'location of dynamic-dynamodb.conf'
   method_option :stop_cmd, :banner => 'bash stop command for dynamic-dynamodb service' 
   method_option :start_cmd, :banner => 'bash start command for dynamic-dynamodb service' 
@@ -61,7 +61,7 @@ Options:
   --config-file=location of dynamic-dynamodb.conf
   --factor scale factor can be decimal too 0.5 for instance
   [--schedule-restore=number of minutes for ElasticDynamoDb to restore original values] # Default: 0 (No restore)
-  [--working-dir=location for backup config and change log [default current dir]]
+  [--working-dir=location for backup config and change log [default home user dir]]
   [--stop-cmd=bash stop command for dynamic-dynamodb service (must be wrapped in quotes)]
   [--start-cmd=bash start command for dynamic-dynamodb service (must be wrapped in quotes)]
   HELP
@@ -221,7 +221,9 @@ private
     else
       if @@in_restore
         confirmed = true
-      else
+      end
+
+      if options[:start_cmd]
         confirmed = yes?("send the start command #{options[:start_cmd]} ? (yes/no)")
       end
 

@@ -2,7 +2,7 @@ $:.push File.expand_path("../lib", __FILE__)
 
 Gem::Specification.new do |s|
   s.name        = "elasticDynamoDb"
-  s.version     = '1.2'
+  s.version     = '1.2.1'
   s.authors     = ["Ami Mahloof"]
   s.email       = "ami.mahloof@gmail.com"
   s.homepage    = "https://github.com/innovia/ElasticDynamoDb"
