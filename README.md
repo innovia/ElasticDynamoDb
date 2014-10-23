@@ -4,7 +4,7 @@
 
 [dynamic-dynamodb](https://github.com/sebdah/dynamic-dynamodb) tool is great for autoscaling but it has a few limitation:
 
-* it does not scale down at once to certian value
+* it does not scale down at once to a certain value
 
 * it does not accomodate for anticipated traffic spike that can last X hours
 
