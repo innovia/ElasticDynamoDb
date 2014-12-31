@@ -206,7 +206,6 @@ private
       provisioning ={}
 
       active_throughputs = self.config.keys.select{|k| k =~ /table/}
-      say "size: #{active_throughputs.size}", color = :blue
       active_throughputs.inject(provisioning) { |acc, config_section|
         config_section =~ /^(gsi:\ *\^(?<index>.*)\$|)\ *table:\ *\^(?<table>.*)\$/
         index = $1
@@ -287,10 +286,15 @@ private
       if ready
         say "Updating provisioning for table: #{table_options[:table_name]}", color = :cyan
         begin
-          self.ddb.update_table(table_options)
+          result = self.ddb.update_table(table_options)
         rescue Exception => e
           say "\nUnable to update table: #{e.message}\n", color = :red
           
+          if e.message.include?('The requested throughput value equals the current value')
+            say "Skipping table update - the requested throughput value equals the current value", color = :yellow
+            return         
+          end
+
           dynamo_max_limit_error = 'Only 10 tables can be created, updated, or deleted simultaneously'
           if e.message.include?(dynamo_max_limit_error)
             say "#{dynamo_max_limit_error}\nTable #{table_options[:table_name]} is not ready for update, waiting 5 sec before retry", color = :yellow

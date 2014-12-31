@@ -3,10 +3,19 @@ $:.unshift File.expand_path(File.join(File.dirname(__FILE__), %w[.. lib]))
 require 'thor'
 require 'elasticDynamoDb'
 
+def help
+	ElasticDynamoDb::Cli.help(Thor::Base.shell.new) 
+end
+
 begin
   ENV["THOR_DEBUG"] = "1" 
   ElasticDynamoDb::Cli.start
 rescue Thor::RequiredArgumentMissingError => e
   puts "\e[31mMissing Arguments: #{e}\e[0m\n\n"
-  ElasticDynamoDb::Cli.help(Thor::Base.shell.new)     
+  help
+rescue Thor::InvocationError => e
+	puts "\e[31m#{e.to_s.gsub(/Usage:.+"/, '').chomp} but there's no such option\e[0m\n\n"
+	help
 end
+
+
