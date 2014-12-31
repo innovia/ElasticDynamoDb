@@ -298,7 +298,6 @@ private
 
       if ready
         say "Updating provisioning for table: #{table_options[:table_name]}...", color = :cyan
-        say "Ok"
         begin
           result = self.ddb.update_table(table_options)
         rescue Exception => e
