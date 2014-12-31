@@ -88,7 +88,7 @@ private
     write_config(factor)
     begin
       if options[:stop_cmd]
-        say "Stopping dynamic-dynamodb process using the command #{options[:stop_cmd]}"
+        say "Stopping dynamic-dynamodb process using the command #{options[:stop_cmd]}", color = :cyan
         system(options[:stop_cmd])
       end 
     rescue Exception => e
@@ -99,7 +99,7 @@ private
     
     begin
       if options[:start_cmd]
-        say "Starting dynamic-dynamodb process using the command #{options[:start_cmd]}"
+        say "Starting dynamic-dynamodb process using the command #{options[:start_cmd]}", color = :cyan
         system(options[:start])
       end 
     rescue Exception => e
