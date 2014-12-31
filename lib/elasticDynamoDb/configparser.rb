@@ -7,7 +7,8 @@ class ConfigParser < Hash
     begin
       input_source = File.open(@file_name, "r").each_line if @file_name
     rescue Exception => e
-      puts "error loading file -> #{e}"
+      puts "\e[31mError loading file: #{e}\e[0m\n\n"
+      exit 1
     end
     config = {}
     config_section = nil
