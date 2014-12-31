@@ -36,8 +36,10 @@ class ElasticDynamoDb::Cli < Thor
       say "#{Time.now} - Restoring to original config file (#{self.original_config_file})"
       process_config(self.original_config_file, 1)
     end
-      
-    say "All done! you may restart the dynamic-dynamodb process", color = :white
+    
+    unless options[:start_cmd] || options[:stop_cmd]  
+      say "All done! you may restart the dynamic-dynamodb process manually", color = :white
+    end
   end
 
   map ["-v", "--version"] => :version
@@ -90,9 +92,19 @@ private
         system(options[:stop_cmd])
       end 
     rescue Exception => e
-      puts "error trying the stop command: #{e}"
+      say "error trying the stop command: #{e}", color = :red
     end
+
     update_aws_api
+    
+    begin
+      if options[:start_cmd]
+        say "Starting dynamic-dynamodb process using the command #{options[:start_cmd]}"
+        system(options[:start])
+      end 
+    rescue Exception => e
+      say "Error trying the start command: #{e}", color = :red
+    end
   end
 
   def read_config(config_file)
