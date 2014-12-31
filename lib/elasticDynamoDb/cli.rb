@@ -49,6 +49,7 @@ class ElasticDynamoDb::Cli < Thor
 private
   def init
     working_dir = File.expand_path(options[:working_dir])
+    self.config_file_name = File.basename(options[:config_file])
     read_config(File.expand_path(options[:config_file]))
 
     self.restore_in_progress = false
@@ -56,7 +57,7 @@ private
     self.backup_folder  = "#{working_dir}/ElasticDynamoDb/dynamodb_config_backups"
     self.log_file    = "#{working_dir}/ElasticDynamoDb/change.log" 
 
-    self.original_config_file = "#{self.backup_folder}/#{config_file_name}-#{options[:timestamp]}"
+    self.original_config_file = "#{self.backup_folder}/#{self.config_file_name}-#{options[:timestamp]}"
 
     FileUtils.mkdir_p self.backup_folder
   end
