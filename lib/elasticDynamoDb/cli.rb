@@ -37,7 +37,7 @@ class ElasticDynamoDb::Cli < Thor
       process_config(self.original_config_file, 1)
     end
       
-    say("All done! you may restart the dynamic-dynamodb process")
+    say("All done! you may restart the dynamic-dynamodb process"), color = :white
   end
 
   map ["-v", "--version"] => :version
@@ -128,15 +128,16 @@ private
 
   def write_config(scale_factor)
     if options[:schedule_restore] > 0 
-      restore = "Auto restore to backup config file (#{self.original_config_file}) in #{options[:schedule_restore]} minutes"
+      restore = "\n\nAuto restore to backup config file (#{self.original_config_file}) in #{options[:schedule_restore]} minutes"
     else
-      restore = "Backup to #{self.original_config_file}"
+      restore = "Backup will be save to #{self.original_config_file}"
     end
 
     if self.restore_in_progress
       confirmed = true
     else
-      confirmed = yes?("Overwrite the new config file (#{restore})? (yes/no)", color=:red)
+      say "#{restore}", color = :white
+      confirmed = yes?("Overwrite the new config file? (yes/no)", color=:white)
     end
 
     if confirmed
@@ -160,7 +161,7 @@ private
       save_file(str_to_write)
 
       if !self.restore_in_progress
-        reason = ask('Type the reason for the change: ', color=:magenta)
+        reason = ask("\nType the reason for the change: ", color=:magenta)
       else
         reason = "Auto restore to #{self.original_config_file}"
       end
@@ -198,7 +199,7 @@ private
     if self.restore_in_progress
       confirmed = true
     else
-      confirmed = yes?('Update all tables with these values on DynamoDb? (yes/no)', color=:red)
+      confirmed = yes?("\nUpdate all tables with these values on DynamoDb? (yes/no)", color=:white)
     end
 
     if confirmed
@@ -242,7 +243,7 @@ private
             system(options[:start_cmd])
           end 
         rescue Exception => e
-          say "error trying the start command: #{e.message}", color = :red
+          say "Error trying the start command: #{e.message}", color = :red
         end
       end
       exit
