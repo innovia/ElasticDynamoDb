@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 $:.unshift File.expand_path(File.join(File.dirname(__FILE__), %w[.. lib]))
 require 'thor'
-require 'elasticDynamoDB'
+require 'elasticDynamoDb'
 
 begin
   ENV["THOR_DEBUG"] = "1" 
