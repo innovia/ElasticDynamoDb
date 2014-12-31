@@ -37,7 +37,7 @@ class ElasticDynamoDb::Cli < Thor
       process_config(self.original_config_file, 1)
     end
       
-    say("All done! you may restart the dynamic-dynamodb process"), color = :white
+    say "All done! you may restart the dynamic-dynamodb process", color = :white
   end
 
   map ["-v", "--version"] => :version
