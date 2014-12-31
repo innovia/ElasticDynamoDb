@@ -297,13 +297,14 @@ private
       ready = check_status(table_options[:table_name])
 
       if ready
-        say "Updating provisioning for table: #{table_options[:table_name]}", color = :cyan
+        say "Updating provisioning for table: #{table_options[:table_name]}...", color = :cyan
+        say "Ok"
         begin
           result = self.ddb.update_table(table_options)
         rescue Exception => e
           say "\nUnable to update table: #{e.message}\n", color = :red
           
-          if e.message.include?('The requested throughput value equals the current value')
+          if e.message.include?('The requested throughput value equals the current value') || e.message.include?('The requested value equals the current value')
             say "Skipping table update - the requested throughput value equals the current value", color = :yellow
             return         
           end
