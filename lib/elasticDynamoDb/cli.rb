@@ -86,25 +86,23 @@ private
     read_config(file)
     scale(factor)
     write_config(factor)
-    begin
-      if options[:stop_cmd]
-        say "Stopping dynamic-dynamodb process using the command #{options[:stop_cmd]}", color = :cyan
-        system(options[:stop_cmd])
-      end 
-    rescue Exception => e
-      say "error trying the stop command: #{e}", color = :red
-    end
-
+        
+    process_ctrl('Stopping', options[:stop_cmd])
+    
     update_aws_api
     
+    process_ctrl('Starting', options[:start_cmd])
+  end
+
+  def process_ctrl(desc, action)
     begin
-      if options[:start_cmd]
-        say "Starting dynamic-dynamodb process using the command #{options[:start_cmd]}", color = :cyan
-        system(options[:start])
+      if action
+        say "#{desc} dynamic-dynamodb process using the command #{action}", color = :cyan
+        system(action)
       end 
     rescue Exception => e
-      say "Error trying the start command: #{e}", color = :red
-    end
+      say "Error: fail to run the command: #{e}", color = :red
+    end  
   end
 
   def read_config(config_file)
