@@ -1,3 +1,9 @@
+1.4.1
+-----
+fix issue of scaling incorrectly when using decimals for example 
+scale factor of 0.3 on a provisioned throuput of 1 would become 1 (using ciel)
+
+
 1.4.0
 -----
 
