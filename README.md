@@ -36,6 +36,7 @@ breakdown:
 * schedule-restore - when to restore back to the original values before this scale (in 7 hours => 7 * 60 = 420 minutes)
 
 ##Notes:
+````text
 --factor 
 can be decimal points for down scale - i.e 0.25 is 4x less the current values of the config file
 
@@ -54,9 +55,13 @@ DynamoDB Local ignores provisioned throughput settings, even though the API requ
 
 -- start-time / --schdeule-restore [optional] both or each separatly can be called
  
+````
 ## Installation
+````bash
     $ gem install elasticDynamoDb
+````
 
+````bash
 Usage: elasticDynamoDb
 
 Commands:
@@ -76,7 +81,7 @@ Options:
 
   --local, [--no-local] # run on DynamoDBLocal
 
-
+````
 ## Contributing
 
 1. Fork it
