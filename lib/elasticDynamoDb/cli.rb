@@ -131,8 +131,8 @@ private
         say("Current min-read from #{options[:config_file]}: #{min_reads}")
         say("Current min-write from #{options[:config_file]}: #{min_writes}")
 
-        self.config[prefix]['min-provisioned-reads'] = (min_reads * scale_factor).ciel
-        self.config[prefix]['min-provisioned-writes'] = (min_writes * scale_factor).ciel
+        self.config[prefix]['min-provisioned-reads'] = (min_reads * scale_factor).ceil
+        self.config[prefix]['min-provisioned-writes'] = (min_writes * scale_factor).ceil
 
         say("New min reads: #{self.config[prefix]['min-provisioned-reads']}", color=:yellow)
         say("New min writes: #{self.config[prefix]['min-provisioned-writes']}", color=:yellow)
