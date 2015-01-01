@@ -23,7 +23,7 @@ elasticDynamoDb --factor 4 \
                 --stop-cmd 'stop dynamic-dyanmodb' \ 
                 --start-cmd 'start dynamic-dyanmodb' \
                 --start-timer 300 \
-                --schedule-restore  
+                --schedule-restore 420
 ````
 
 breakdown:
