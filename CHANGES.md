@@ -1,3 +1,8 @@
+1.4.0
+-----
+
+* add start_timer option to auto pilot and start in a future time
+
 1.3.0
 -----
 

@@ -1,40 +1,81 @@
 ## Elastic DynamoDb [![Gem Version](https://badge.fury.io/rb/elasticDynamoDb.svg)](http://badge.fury.io/rb/elasticDynamoDb)
 
-  an OnDemand tool to help with auto scaling of [dynamic-dynamodb](https://github.com/sebdah/dynamic-dynamodb)
+  a wrapper tool to help with large planned traffic spike in combination with [dynamic-dynamodb](https://github.com/sebdah/dynamic-dynamodb)
+
 
 [dynamic-dynamodb](https://github.com/sebdah/dynamic-dynamodb) tool is great for autoscaling but it has a few limitation:
 
-* it does not scale down at once to a certain value
-
 * it does not accomodate for anticipated traffic spike that can last X hours
 
+* it does not scale down at once to a certain value:
+  becasue of the settings you gave it in the config file dynamic-dynamodb will decrease in percentages and you might get stuck with the AWS limit of no more than 4 decreases per 24 hours)
 
-ElasticDynamoDb is intended to extend the functionality of dynamic-dynamodb, allowing you to scale by a factor (up/down) and elastically return to the original values it had before
 
-it's possible to automate the start and stop of the dynamic-dyanmodb service by passing a bash command (wrapped in quotes) to the --start_cmd / --stop_cmd options
+## Real example:
 
+It's 10PM you know there's a planned marketing campaign of 4x the normal traffic that will start at 3AM and will last until 5AM 
+
+You can launch elastic dynamodb as follow:
+
+````bash
+elasticDynamoDb --factor 4 \
+                --config-file '../dynamic-dynamodb.conf' \
+                --stop-cmd 'stop dynamic-dyanmodb' \ 
+                --start-cmd 'start dynamic-dyanmodb' \
+                --start-timer 300 \
+                --schedule-restore  
+````
+
+breakdown:
+
+* factor - reads the current values off dyanmic-dynamodb.conf and scale the minimum for reads / writes by 4
+* conifg-file - is the location for the dynamic-dynamodb.conf file
+* stop-cmd - the command that will stop dynamic-dyanmodb process 
+* start-cmd - the command that will start dynamic-dyanmodb process
+* start-timer - when to start the elasticDynamoDb operation (in 5 hours => 5 * 60 = 300 minutes)
+* schedule-restore - when to restore back to the original values before this scale (in 7 hours => 7 * 60 = 420 minutes)
+
+Note:
+--factor 
+can be decimal points for down scale - i.e 0.25 is 4x less the current values of the config file
+
+--working-dir  
+the process logs the changes to the tables in a folder called ElasticDynamoDB in your home folder, if you need to change that location for that folder use --working-dir
+
+this is also the place where the config file is backed up to
+
+--local
+enable testing on [DynamoDbLocal] (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Tools.DynamoDBLocal.html#Tools.DynamoDBLocal.DownloadingAndRunning)
+
+this changes the throuput of tables but:
+DynamoDB Local ignores provisioned throughput settings, even though the API requires them. For CreateTable, you can specify any numbers you want for provisioned read and write throughput, even though these numbers will not be used. You can call UpdateTable as many times as you like per day; however, any changes to provisioned throughput values are ignored.
+
+--start-cmd / --stop-cmd [optional] stop and start dynamic-dyanmodb so that it doesn't intrrupt with the scale activity of ElasticDynamoDb
+
+-- start-time / --schdeule-restore [optional] both or each separatly can be called
+ 
 ## Installation
     $ gem install elasticDynamoDb
 
-Usage:
-````bash
-  elasticDynamoDb onDemand \
-    --config-file /etc/dynamic-dynamodb.conf \
-    --factor 2 \
-    --schedule-restore 120
-    --start_cmd "sudo start dynamic-dynamodb" \
-    --stop_cmd "sudo stop dynamic-dynamodb" 
-````
+Usage: elasticDynamoDb
 
-````text
+Commands:
+  elasticDynamoDb                 # Ease autoscale by schedule or scale factor
+  elasticDynamoDb version         # version
+
 Options:
-  --config-file = Location of dynamic-dynamodb.conf
-  --factor = Scale factor can be decimal too 0.5 for instance
- [--schedule-restore = Number of minutes for ElasticDynamoDb to restore original values] # Default: 0 (No restore)
- [--working-dir = Location for backup config and change log [default current dir]]
- [--stop-cmd = Bash stop command for dynamic-dynamodb service] (must be wrapped in quotes)
- [--start-cmd = Bash start command for dynamic-dynamodb service] (must be wrapped in quotes)
-````
+  --factor scale factor can be decimal too 0.5 for instance
+  --config-file location of dynamic-dynamodb.conf
+  --working-dir location for backup config and change log # Default: User home folder (~)
+  
+  --stop-cmd Bash stop command for dynamic-dynamodb service (must be wrapped in quotes)
+  --start-cmd bash start command for dynamic-dynamodb service (must be wrapped in quotes)
+              
+  --start-timer   when to start the upscale automatically! value in minutes
+  --schedule-restore number of minutes for ElasticDynamoDb to restore original values
+
+  --local, [--no-local] # run on DynamoDBLocal
+
 
 ## Contributing
 

@@ -9,7 +9,7 @@ class ElasticDynamoDb::Cli < Thor
   include Thor::Actions
   default_task  :onDemand
   attr_accessor :restore_in_progress, :backup_folder, :config_file_name, :original_config_file, :config, :ddb,
-                :log_file
+                :log_file, :automated_reason
 
   desc "onDemand", "Ease autoscale by schedule or scale factor"
   class_option :factor,            :type => :numeric,                         :banner => 'scale factor can be decimal too 0.5 for instance'
@@ -20,12 +20,20 @@ class ElasticDynamoDb::Cli < Thor
   class_option :schedule_restore,  :type => :numeric, :default => 0,          :banner => 'number of minutes for ElasticDynamoDb to restore original values'
   class_option :timestamp,         :default => Time.now.utc.strftime("%m%d%Y-%H%M%S")
   class_option :local,             :type => :boolean, :default => false,      :desc => 'run on DynamoDBLocal'
+  class_option :start_timer,       :type => :numeric, :desc => 'when to start the upscale automatically! value in minutes'
   def onDemand
     raise Thor::RequiredArgumentMissingError, 'You must supply a scale factor' if options[:factor].nil?
     raise Thor::RequiredArgumentMissingError, 'You must supply the path to the dynamic-dyanmodb config file' if options[:config_file].nil?
     init
     aws_init
 
+    if options[:start_timer]
+      say "Auto pilot will start in #{options[:start_timer]} minutes (#{Time.now + options[:start_timer] * 60})"
+      self.automated_reason = ask("\nType the reason for the change: ", color = :magenta)
+      say "Waiting here for #{options[:start_timer]} minutes to start fully automated"
+      sleep options[:start_timer] * 60
+    end
+    
     process_config(options[:config_file], options[:factor])    
     
     if options[:schedule_restore] > 0 && !restore_in_progress
@@ -131,7 +139,7 @@ private
         say("------------------------------------------------")
       end
     else
-      say("Need a factor to scale by,(i.e scale --factor 2)", color=:green)
+      say("Need a factor to scale by,(i.e scale --factor 2)", color = :green)
       exit
     end
   end
@@ -143,11 +151,15 @@ private
       restore = "Backup will be save to #{self.original_config_file}"
     end
 
-    if self.restore_in_progress
+    if self.restore_in_progress 
       confirmed = true
     else
       say "#{restore}", color = :white
-      confirmed = yes?("Overwrite the new config file? (yes/no)", color=:white)
+      if options[:start_timer]
+        confirmed = true
+      else
+        confirmed = yes?("Overwrite the new config file? (yes/no)", color = :white)
+      end
     end
 
     if confirmed
@@ -171,7 +183,11 @@ private
       save_file(str_to_write)
 
       if !self.restore_in_progress
-        reason = ask("\nType the reason for the change: ", color=:magenta)
+        if options[:start_timer]
+          reason = self.automated_reason
+        else
+          reason = ask("\nType the reason for the change: ", color = :magenta)
+        end
       else
         reason = "Auto restore to #{self.original_config_file}"
       end
@@ -180,7 +196,7 @@ private
       
       say("New config changes commited to file")
     else
-      say("Not doing antything - Goodbye...", color=:green)
+      say("Not doing antything - Goodbye...", color = :green)
       exit
     end  
   end
@@ -209,7 +225,11 @@ private
     if self.restore_in_progress
       confirmed = true
     else
-      confirmed = yes?("\nUpdate all tables with these values on DynamoDb? (yes/no)", color=:white)
+      if options[:start_timer]
+        confirmed = true
+      else
+        confirmed = yes?("\nUpdate all tables with these values on DynamoDb? (yes/no)", color = :white)
+      end
     end
 
     if confirmed
@@ -234,28 +254,28 @@ private
         end
         acc  
       }
+      
       log_changes("Update AWS via api call with the following data:\n #{provisioning}\n")
+      
       say "\nWill update: #{provisioning.keys.size} tables\n\n\n", color = :blue
+      
       update_tables(provisioning)
     else
+      
       if self.restore_in_progress
         confirmed = true
       end
 
-      if options[:start_cmd]
+      if options[:start_timer] && options[:start_cmd]
+        confirmed = true
+      elsif options[:start_cmd] && !options[:start_timer]
         confirmed = yes?("Send the start command #{options[:start_cmd]} ? (yes/no)")
       end
 
       if confirmed
-        begin
-          if options[:start_cmd]
-            say "Starting up dynamic-dynamodb service using the command #{options[:start_cmd]}", color = :white
-            system(options[:start_cmd])
-          end 
-        rescue Exception => e
-          say "Error trying the start command: #{e.message}", color = :red
-        end
+       process_ctrl('Starting', options[:start_cmd])
       end
+
       exit
     end
   end
