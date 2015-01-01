@@ -35,7 +35,7 @@ breakdown:
 * start-timer - when to start the elasticDynamoDb operation (in 5 hours => 5 * 60 = 300 minutes)
 * schedule-restore - when to restore back to the original values before this scale (in 7 hours => 7 * 60 = 420 minutes)
 
-Note:
+##Notes:
 --factor 
 can be decimal points for down scale - i.e 0.25 is 4x less the current values of the config file
 
