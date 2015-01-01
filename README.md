@@ -28,15 +28,20 @@ elasticDynamoDb --factor 4 \
 
 breakdown:
 
-* factor - reads the current values off dyanmic-dynamodb.conf and scale the minimum for reads / writes by 4
-* conifg-file - is the location for the dynamic-dynamodb.conf file
-* stop-cmd - the command that will stop dynamic-dyanmodb process 
-* start-cmd - the command that will start dynamic-dyanmodb process
-* start-timer - when to start the elasticDynamoDb operation (in 5 hours => 5 * 60 = 300 minutes)
-* schedule-restore - when to restore back to the original values before this scale (in 7 hours => 7 * 60 = 420 minutes)
+* factor
+   <br />&nbsp;&nbsp;&nbsp;reads the current values off dyanmic-dynamodb.conf and scale the minimum for reads / writes by 4
+
+* conifg-file <br />&nbsp;&nbsp;&nbsp; is the location for the dynamic-dynamodb.conf file
+
+* stop-cmd <br />&nbsp;&nbsp;&nbsp;the command that will stop dynamic-dyanmodb process 
+
+* start-cmd <br />&nbsp;&nbsp;&nbsp;the command that will start dynamic-dyanmodb process
+
+* start-timer  <br />&nbsp;&nbsp;&nbsp;when to start the elasticDynamoDb operation (in 5 hours => 5 * 60 = 300 minutes)
+* schedule-restore <br />&nbsp;&nbsp;&nbsp;when to restore back to the original values before this scale (in 7 hours => 7 * 60 = 420 minutes)
 
 ##Notes:
-````text
+
 --factor 
 can be decimal points for down scale - i.e 0.25 is 4x less the current values of the config file
 
@@ -49,13 +54,12 @@ this is also the place where the config file is backed up to
 enable testing on [DynamoDbLocal] (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Tools.DynamoDBLocal.html#Tools.DynamoDBLocal.DownloadingAndRunning)
 
 this changes the throuput of tables but:
-DynamoDB Local ignores provisioned throughput settings, even though the API requires them. For CreateTable, you can specify any numbers you want for provisioned read and write throughput, even though these numbers will not be used. You can call UpdateTable as many times as you like per day; however, any changes to provisioned throughput values are ignored.
+>DynamoDB Local ignores provisioned throughput settings, even though the API requires them. For CreateTable, you can specify any numbers you want for provisioned read and write throughput, even though these numbers will not be used. You can call UpdateTable as many times as you like per day; however, any changes to provisioned throughput values are ignored.
 
 --start-cmd / --stop-cmd [optional] stop and start dynamic-dyanmodb so that it doesn't intrrupt with the scale activity of ElasticDynamoDb
 
 -- start-time / --schdeule-restore [optional] both or each separatly can be called
  
-````
 
 ## Installation
     $ gem install elasticDynamoDb
