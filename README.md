@@ -56,12 +56,11 @@ DynamoDB Local ignores provisioned throughput settings, even though the API requ
 -- start-time / --schdeule-restore [optional] both or each separatly can be called
  
 ````
-## Installation
-````bash
-    $ gem install elasticDynamoDb
-````
 
-````bash
+## Installation
+    $ gem install elasticDynamoDb
+
+````text
 Usage: elasticDynamoDb
 
 Commands:
@@ -80,8 +79,8 @@ Options:
   --schedule-restore number of minutes for ElasticDynamoDb to restore original values
 
   --local, [--no-local] # run on DynamoDBLocal
-
 ````
+
 ## Contributing
 
 1. Fork it
