@@ -1,3 +1,9 @@
+1.5
+----
+added cloudwatch alarms setter acording to what's in the config
+fix a bug where more than 10 tables would not update automatically
+
+
 1.4.2
 -----
 fix issue of scaling incorrectly when using decimals for example 

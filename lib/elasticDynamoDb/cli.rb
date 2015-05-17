@@ -9,7 +9,8 @@ class ElasticDynamoDb::Cli < Thor
   autoload :ConfigParser, 'configparser'
   autoload :CloudWatch,   'cloudwatch'
 
-  extend CloudWatch
+  include CloudWatch
+  
   default_task  :onDemand
   attr_accessor :restore_in_progress, :backup_folder, :config_file_name, :original_config_file, :config, :ddb, :cw,
                 :log_file, :automated_reason, :skip_cloudwatch
@@ -125,8 +126,6 @@ private
   def read_config(config_file)
     self.config = ConfigParser.new(config_file).parse
   end
-
-
 
   def scale(factor=nil)
     if !factor.nil?
@@ -245,7 +244,7 @@ private
 
     if confirmed
      
-      provisioning ={}
+      provisioning = {}
 
       active_throughputs = self.config.keys.select{|k| k =~ /table/}
       active_throughputs.inject(provisioning) { |acc, config_section|
@@ -262,17 +261,19 @@ private
           acc[table] ||= {}
           acc[table]['reads']  = self.config[config_section]['min-provisioned-reads'].to_i
           acc[table]['writes'] = self.config[config_section]['min-provisioned-writes'].to_i
+          acc[table]['sns-topic-arn'] = self.config[config_section]['sns-topic-arn'] if !self.config[config_section]['sns-topic-arn'].nil?
+          acc[table]['reads-upper-alarm-threshold'] = self.config[config_section]['reads-upper-alarm-threshold'] if !self.config[config_section]['reads-upper-alarm-threshold'].nil?
+          acc[table]['writes-upper-alarm-threshold'] = self.config[config_section]['writes-upper-alarm-threshold'] if !self.config[config_section]['writes-upper-alarm-threshold'].nil?
         end
 
-         acc[table]['sns'] = self.config[config_section]['sns-topic-arn'] if !self.config[config_section]['sns-topic-arn'].nil?
         acc  
       }
       
       log_changes("Update AWS via api call with the following data:\n #{provisioning}\n")
       
       say "\nWill update: #{provisioning.keys.size} tables\n\n\n", color = :blue
-      
-      puts "Debug provisioning: #{provisioning}"
+      puts "provisioning: #{provisioning}"
+
       update_tables(provisioning)
     else
       
@@ -325,12 +326,10 @@ private
   end
 
   def update!(table_options)
+    puts "table_options: #{table_options}"
     say "Updating provisioning for table: #{table_options[:table_name]}...", color = :cyan
-    self.ddb.update_table(table_options)
-
-    set_cloudwatch_alarms(table_options)
+    self.ddb.update_table(table_options.reject {|k| k =~ /sns|alarm/})
   end
-
 
   def update_table_if_ready(table_options)
     while true
@@ -344,6 +343,7 @@ private
           
           if e.message.include?('The requested throughput value equals the current value') || e.message.include?('The requested value equals the current value')
             say "Skipping table update - the requested throughput value equals the current value", color = :yellow
+            set_cloudwatch_alarms(table_options) unless self.skip_cloudwatch 
             return         
           end
 
@@ -356,8 +356,9 @@ private
           say "\nRetrying update on #{table_options[:table_name]}", color = :yellow
           update!(table_options) if e.message.include?('The requested throughput value equals the current value')          
         end
-        return
         
+        set_cloudwatch_alarms(table_options) unless self.skip_cloudwatch
+        return
       else
         say "Table #{table_options[:table_name]} is not ready for update, waiting 5 sec before retry", color = :yellow
         sleep 5
@@ -367,21 +368,26 @@ private
 
   def update_tables(provisioning)
     provisioning.each do |table, values|
+      say "table values before provisioning: #{values}", color  = :cyan
+
       table_options = {
         :table_name => table,
         :provisioned_throughput => {:read_capacity_units =>  values['reads'], :write_capacity_units =>  values['writes']}
       }
         
-      table_options.merge!({:sns => values['sns']}) if values['sns']
+      table_options.merge!({:sns_topic_arn => values['sns-topic-arn']}) if values['sns-topic-arn']
+      table_options.merge!({:reads_upper_alarm_threshold => values['reads-upper-alarm-threshold']}) if values['reads-upper-alarm-threshold']
+      table_options.merge!({:writes_upper_alarm_threshold => values['writes-upper-alarm-threshold']}) if values['writes-upper-alarm-threshold']
+
       # if one of the keys for the table contain index merge the options for update table
       indexes = provisioning[table].keys.select { |key| key.match(/index/) }
       if !indexes.empty?
         indexes.each do |index|
           table_options.merge!({ 
             :global_secondary_index_updates => [{:update => { 
-                                                  :index_name => index,
-                                                  :provisioned_throughput => {:read_capacity_units =>  values[index]['reads'], :write_capacity_units => values[index]['writes']}
-                                                }}]
+              :index_name => index,
+              :provisioned_throughput => {:read_capacity_units =>  values[index]['reads'], :write_capacity_units => values[index]['writes']}
+            }}]
           })
         end
       end

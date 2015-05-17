@@ -2,6 +2,8 @@
 
   a wrapper tool to help with large planned traffic spike in combination with [dynamic-dynamodb](https://github.com/sebdah/dynamic-dynamodb)
 
+  now supporting resetting CloudWatch alarms on table updates
+
 
 [dynamic-dynamodb](https://github.com/sebdah/dynamic-dynamodb) tool is great for autoscaling but it has a few limitation:
 
