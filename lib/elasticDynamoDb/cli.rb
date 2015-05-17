@@ -1,15 +1,18 @@
 #!/usr/bin/env ruby
 require 'thor'
-require 'aws-sdk-core'
+require 'aws-sdk'
 require 'fileutils'
-
-autoload :ConfigParser, 'elasticDynamoDb/configparser'
+$:.unshift File.expand_path(File.join(File.dirname(__FILE__), '.'))
 
 class ElasticDynamoDb::Cli < Thor
   include Thor::Actions
+  autoload :ConfigParser, 'configparser'
+  autoload :CloudWatch,   'cloudwatch'
+
+  extend CloudWatch
   default_task  :onDemand
-  attr_accessor :restore_in_progress, :backup_folder, :config_file_name, :original_config_file, :config, :ddb,
-                :log_file, :automated_reason
+  attr_accessor :restore_in_progress, :backup_folder, :config_file_name, :original_config_file, :config, :ddb, :cw,
+                :log_file, :automated_reason, :skip_cloudwatch
 
   desc "onDemand", "Ease autoscale by schedule or scale factor"
   class_option :factor,            :type => :numeric,                         :banner => 'scale factor can be decimal too 0.5 for instance'
@@ -70,6 +73,8 @@ private
     self.original_config_file = "#{self.backup_folder}/#{self.config_file_name}-#{options[:timestamp]}"
 
     FileUtils.mkdir_p self.backup_folder
+
+    self.skip_cloudwatch = false
   end
 
   def aws_init
@@ -77,16 +82,20 @@ private
       ENV['AWS_REGION'] = 'us-east-1'
       say "using local DynamoDB"
       self.ddb = Aws::DynamoDB::Client.new({endpoint: 'http://localhost:4567', api: '2012-08-10'})
+      self.skip_cloudwatch = true
     else
       credentials = Aws::Credentials.new(
         self.config['global']['aws-access-key-id'], self.config['global']['aws-secret-access-key-id']
       )
 
-      self.ddb = Aws::DynamoDB::Client.new({
-        api: '2012-08-10', 
+      aws_config = {        
         region: self.config['global']['region'],
         credentials: credentials
-      })  
+      }
+
+      self.ddb = Aws::DynamoDB::Client.new(aws_config.merge({api: '2012-08-10'}))
+
+      self.cw  = Aws::CloudWatch::Client.new(aws_config)  
     end
   end
 
@@ -116,6 +125,8 @@ private
   def read_config(config_file)
     self.config = ConfigParser.new(config_file).parse
   end
+
+
 
   def scale(factor=nil)
     if !factor.nil?
@@ -252,6 +263,8 @@ private
           acc[table]['reads']  = self.config[config_section]['min-provisioned-reads'].to_i
           acc[table]['writes'] = self.config[config_section]['min-provisioned-writes'].to_i
         end
+
+         acc[table]['sns'] = self.config[config_section]['sns-topic-arn'] if !self.config[config_section]['sns-topic-arn'].nil?
         acc  
       }
       
@@ -259,6 +272,7 @@ private
       
       say "\nWill update: #{provisioning.keys.size} tables\n\n\n", color = :blue
       
+      puts "Debug provisioning: #{provisioning}"
       update_tables(provisioning)
     else
       
@@ -310,14 +324,21 @@ private
     indexes_status
   end
 
-  def update_single_table(table_options)
+  def update!(table_options)
+    say "Updating provisioning for table: #{table_options[:table_name]}...", color = :cyan
+    self.ddb.update_table(table_options)
+
+    set_cloudwatch_alarms(table_options)
+  end
+
+
+  def update_table_if_ready(table_options)
     while true
       ready = check_status(table_options[:table_name])
 
       if ready
-        say "Updating provisioning for table: #{table_options[:table_name]}...", color = :cyan
         begin
-          result = self.ddb.update_table(table_options)
+          result = update!(table_options)
         rescue Exception => e
           say "\nUnable to update table: #{e.message}\n", color = :red
           
@@ -333,7 +354,7 @@ private
           end
 
           say "\nRetrying update on #{table_options[:table_name]}", color = :yellow
-          update_single_table(table_options) if e.message.include?('The requested throughput value equals the current value')          
+          update!(table_options) if e.message.include?('The requested throughput value equals the current value')          
         end
         return
         
@@ -347,31 +368,25 @@ private
   def update_tables(provisioning)
     provisioning.each do |table, values|
       table_options = {
-                  :table_name => table,
-                  :provisioned_throughput => {
-                                              :read_capacity_units =>  values['reads'],
-                                              :write_capacity_units =>  values['writes']
-                  }
+        :table_name => table,
+        :provisioned_throughput => {:read_capacity_units =>  values['reads'], :write_capacity_units =>  values['writes']}
       }
         
+      table_options.merge!({:sns => values['sns']}) if values['sns']
       # if one of the keys for the table contain index merge the options for update table
       indexes = provisioning[table].keys.select { |key| key.match(/index/) }
       if !indexes.empty?
         indexes.each do |index|
           table_options.merge!({ 
-                         :global_secondary_index_updates => [{:update => { 
-                                                                            :index_name => index,
-                                                                            :provisioned_throughput => {
-                                                                              :read_capacity_units =>  values[index]['reads'],
-                                                                              :write_capacity_units => values[index]['writes'] 
-                                                                            }
-                                                                          }
-                                                              }]
+            :global_secondary_index_updates => [{:update => { 
+                                                  :index_name => index,
+                                                  :provisioned_throughput => {:read_capacity_units =>  values[index]['reads'], :write_capacity_units => values[index]['writes']}
+                                                }}]
           })
         end
       end
 
-      update_single_table(table_options)
+      update_table_if_ready(table_options)
     end
   end
 end

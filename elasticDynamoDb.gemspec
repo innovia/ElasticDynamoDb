@@ -1,4 +1,6 @@
 $:.push File.expand_path("../lib", __FILE__)
+$:.push File.expand_path("../lib/elasticDynamoDb", __FILE__)
+
 require File.expand_path('../lib/elasticDynamoDb', __FILE__)
 
 Gem::Specification.new do |s|
