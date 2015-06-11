@@ -15,7 +15,7 @@ Gem::Specification.new do |s|
   s.files = `git ls-files`.split($\).reject{|n| n =~ %r[png|gif\z]}.reject{|n| n =~ %r[^(test|spec|features)/]}
   s.add_runtime_dependency 'configparser', '~> 0'
   s.add_runtime_dependency 'thor', '~> 0.19', '>= 0.19.1'
-  s.add_runtime_dependency 'aws-sdk-core', '~> 2.0.17', '>= 2.0.17'
+  s.add_runtime_dependency 'aws-sdk', '~> 2.0.45', '>= 2.0.45'
   s.executables   = s.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
   s.extra_rdoc_files = ['README.md', 'LICENSE']
   s.license = 'MIT'
