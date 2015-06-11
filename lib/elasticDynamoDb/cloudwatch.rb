@@ -26,10 +26,10 @@ module ElasticDynamoDb::Cli::CloudWatch
           value: table_options[:table_name]
         }
       ],
-      period: 60,
+      period: 300,
       unit: "Count",
       threshold: threshold,
-      evaluation_periods: 5,
+      evaluation_periods: 1,
       comparison_operator: "GreaterThanOrEqualToThreshold"
     }
     self.cw.put_metric_alarm(cw_options)
